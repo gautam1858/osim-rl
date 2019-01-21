@@ -17,7 +17,7 @@ Simple 2D arm environment with 2 degrees of freedom and 6 muscles. The objective
 
 <div class="note info">
   <h5>Toy model</h5>
-  <p>Note that Arm2DEnv modle is simplified and not physiologically accurate. We suggest using it only for testing purposes.</p>
+  <p>Note that Arm2DEnv model is simplified and not physiologically accurate. We suggest using it only for testing purposes.</p>
 </div>
 
 ### L2RunEnv
@@ -31,12 +31,12 @@ NIPS 2017 challenge model, where you are asked to build a controller to make a m
 
 ![HUMAN environment](https://s3.amazonaws.com/osim-rl/videos/running.gif)
 
-### ProstheticEnv
+### ProstheticsEnv
 
 NIPS 2018 challenge model, where you are asked to build a controller to make a musculoskeletal model with a prosthetic leg follow desired velocity vector changing in time. Read more in the documents on the [NIPS 2018 challenge](/docs/nips2018/).
 
 | ---:| --- |
-| **# of muscles** | 22 |
+| **# of muscles** | 19 |
 | **# degrees of freedom** | 14 |
 | **reward** | negative distance from requested velocity |
 

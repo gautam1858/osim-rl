@@ -10,6 +10,10 @@ import os
 import timeout_decorator
 import time
 
+########################################################
+# CONSTANTS
+########################################################
+PER_STEP_TIMEOUT = 20*60 # 20minutes
 
 
 class OsimRlRedisService:
@@ -21,7 +25,7 @@ class OsimRlRedisService:
                     remote_port = 6379,
                     remote_db = 0,
                     remote_password = None,
-                    difficulty = 2,
+                    difficulty = 1,
                     max_obstacles = 10,
                     visualize = False,
                     report = None,
@@ -30,6 +34,11 @@ class OsimRlRedisService:
             TODO: Expose more RunEnv related variables
         """
         print("Attempting to connect to redis server at {}:{}/{}".format(remote_host, remote_port, remote_db))
+        self.remote_host = remote_host
+        self.remote_port = remote_port
+        self.remote_db = remote_db
+        self.remote_password = remote_password
+
         self.redis_pool = redis.ConnectionPool(host=remote_host, port=remote_port, db=remote_db, password=remote_password)
         self.namespace = "osim-rl"
         self.service_id = osim_rl_redis_service_id
@@ -60,7 +69,19 @@ class OsimRlRedisService:
             self.seed_map = [np.random.randint(0,10**10)]
 
     def get_redis_connection(self):
-        return redis.Redis(connection_pool=self.redis_pool)
+        redis_conn = redis.Redis(connection_pool=self.redis_pool)
+        try:
+            redis_conn.ping()
+        except:
+            raise Exception(
+                    "Unable to connect to redis server at {}:{} ."
+                    "Are you sure there is a redis-server running at the "
+                    "specified location ?".format(
+                        self.remote_host,
+                        self.remote_port
+                        )
+                    )
+        return redis_conn
 
     def _error_template(self, payload):
         _response = {}
@@ -68,7 +89,7 @@ class OsimRlRedisService:
         _response['payload'] = payload
         return _response
 
-    @timeout_decorator.timeout(15*60)#15*60 seconds timeout for each command
+    @timeout_decorator.timeout(PER_STEP_TIMEOUT)# timeout for each command
     def get_next_command(self, _redis):
         command = _redis.brpop(self.command_channel)[1]
         return command
@@ -112,15 +133,17 @@ class OsimRlRedisService:
                         _redis.rpush( command_response_channel, self._error_template(_error_message))
                         return self._error_template(_error_message)
                     else:
-                        self.env = RunEnv(  visualize = self.visualize,
-                                            max_obstacles = self.max_obstacles,
-                                            report = self.report)
-                        _observation = self.env.reset(seed=self.seed_map[self.simulation_count], difficulty=self.difficulty)
+                        self.env = ProstheticsEnv(  visualize = self.visualize,
+                                                    difficulty = self.difficulty,
+                                                    seed = self.seed_map[self.simulation_count],
+                                                    report = self.report
+                        )
+                        _observation = self.env.reset(project=False)
                         self.begin_simulation = time.time()
                         self.simualation_rewards.append(0)
                         self.env_available = True
                         self.current_step = 0
-                        _observation = np.array(_observation).tolist()
+                        #_observation = np.array(_observation).tolist()
                         if self.report:
                             """
                                 In case of reporting mode, truncate to the first
@@ -128,7 +151,8 @@ class OsimRlRedisService:
                                 (The rest are extra activations which are used only for reporting
                                 and should not be available to the agent)
                             """
-                            _observation = _observation[:41]
+                            #_observation = _observation[:41]
+                            pass
 
                         _command_response = {}
                         _command_response['type'] = messages.OSIM_RL.ENV_CREATE_RESPONSE
@@ -148,11 +172,11 @@ class OsimRlRedisService:
                         self.simulation_times.append(time.time()-self.begin_simulation)
                         self.begin_simulation = time.time()
                     if self.seed_map and self.simulation_count < len(self.seed_map):
-                        _observation = self.env.reset(seed=self.seed_map[self.simulation_count], difficulty=2)
+                        _observation = self.env.reset(seed=self.seed_map[self.simulation_count], project=False)
                         self.simualation_rewards.append(0)
                         self.env_available = True
                         self.current_step = 0
-                        _observation = list(_observation)
+                        #_observation = list(_observation)
                         if self.report:
                             """
                                 In case of reporting mode, truncate to the first
@@ -160,7 +184,8 @@ class OsimRlRedisService:
                                 (The rest are extra activations which are used only for reporting
                                 and should not be available to the agent)
                             """
-                            _observation = _observation[:41]
+                            #_observation = _observation[:41]
+                            pass
 
                         _command_response = {}
                         _command_response['type'] = messages.OSIM_RL.ENV_RESET_RESPONSE
@@ -186,7 +211,7 @@ class OsimRlRedisService:
                     action = args['action']
                     action = np.array(action)
                     if self.env and self.env_available:
-                        [_observation, reward, done, info] = self.env.step(action)
+                        [_observation, reward, done, info] = self.env.step(action, project=False)
                     else:
                         if self.env:
                             raise Exception("Attempt to call `step` function after max_steps={} in a single simulation. Please reset your environment before calling the `step` function after max_step s".format(self.max_steps))
@@ -195,7 +220,7 @@ class OsimRlRedisService:
                     self.reward += reward
                     self.simualation_rewards[-1] += reward
                     self.current_step += 1
-                    _observation = np.array(_observation).tolist()
+                    #_observation = np.array(_observation).tolist()
                     if self.report:
                         """
                             In case of reporting mode, truncate to the first
@@ -203,7 +228,8 @@ class OsimRlRedisService:
                             (The rest are extra activations which are used only for reporting
                             and should not be available to the agent)
                         """
-                        _observation = _observation[:41]
+                        #_observation = _observation[:41]
+                        pass
 
                     if self.current_step >= self.max_steps:
                         _command_response = {}
@@ -269,9 +295,17 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description='Submit the result to crowdAI')
     parser.add_argument('--port', dest='port', action='store', required=True)
+    parser.add_argument('--service_id', dest='service_id', default='osim_rl_redis_service_id', required=False)
+    parser.add_argument('--seed_map',
+                        dest='seed_map',
+                        default="11,22,33",
+                        help="comma separated list of seed values",
+                        required=False)
     args = parser.parse_args()
-
-    grader = OsimRlRedisService(remote_port=int(args.port), seed_map="11,22,33", max_steps=1000, verbose=True)
+    
+    seed_map = args.seed_map
+    print("Seeds : ", seed_map.split(","))
+    grader = OsimRlRedisService(osim_rl_redis_service_id=args.service_id, remote_port=int(args.port), seed_map=seed_map, max_steps=1000, verbose=True)
     result = grader.run()
     if result['type'] == messages.OSIM_RL.ENV_SUBMIT_RESPONSE:
         cumulative_results = result['payload']

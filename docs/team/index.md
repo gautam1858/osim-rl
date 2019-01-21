@@ -10,7 +10,7 @@ coreteam:
     task: OpenSim modeling
   - github: spMohanty
     name: Sharada P. Mohanty
-    task: crowdAI integration
+    task: Baselines & crowdAI integration
   - github: chrisdembia
     name: Christopher Dembia
     task: OpenSim integration
@@ -42,8 +42,9 @@ contributors:
   - github: ViktorM
   - github: LiberiFatali
   - github: JackieTseng
-  - github: seanfcarroll 
+  - github: seanfcarroll
   - github: gautam1858
+  - github: seungjaeryanlee
 ---
 <style>
 .person {
@@ -103,4 +104,3 @@ font-size: 0.8em;
 
 
 <div class="clear"></div>
-
